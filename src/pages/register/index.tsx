@@ -33,7 +33,6 @@ export default function Register() {
                                 displayName: values.name,
                             });
 
-                            // Зберігаємо користувача в Firestore
                             await setDoc(doc(db, "users", userCredential.user.uid), {
                                 name: values.name,
                                 email: values.email,
@@ -50,7 +49,6 @@ export default function Register() {
                 >
                     {({ isSubmitting, status }) => (
                         <Form className="space-y-4">
-                            {/* Поля і валідація */}
                             <div>
                                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                                     Name

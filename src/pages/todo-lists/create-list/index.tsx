@@ -1,8 +1,10 @@
+"use client";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, doc, getDoc, addDoc } from "firebase/firestore";
 import { auth, db } from "@/utils/firebase";
 
 const createListSchema = Yup.object().shape({
@@ -29,17 +31,36 @@ export default function CreateList() {
                                 setSubmitting(false);
                                 return;
                             }
+
+                            const userRef = doc(db, "users", user.uid);
+                            const userSnap = await getDoc(userRef);
+
+                            let name = "No Name";
+                            if (userSnap.exists()) {
+                                const userData = userSnap.data();
+                                name = userData.name || user.displayName || user.email || "No Name";
+                            }
+
                             await addDoc(collection(db, "taskLists"), {
                                 title: values.title,
                                 participants: {
-                                    [user.uid]: "admin",
+                                    [user.uid]: {
+                                        id: user.uid,
+                                        name,
+                                        status: "admin",
+                                    },
                                 },
+                                participantsIds: [user.uid],
                                 createdAt: new Date(),
                             });
+
+
+
                             setStatus("Список успішно створено!");
                             setSubmitting(false);
-                            await router.push("/todo-lists");
+                            router.push("/todo-lists");
                         } catch (error) {
+                            console.error("Помилка при створенні списку:", error);
                             setStatus("Помилка при створенні списку");
                             setSubmitting(false);
                         }

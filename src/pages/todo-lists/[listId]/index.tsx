@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import "@/app/globals.css";
+import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
 import {
     collection,
     getDocs,
@@ -27,7 +28,7 @@ type Task = {
 };
 
 type UserInfo = {
-    displayName: string;
+    name: string;
 };
 
 function formatDate(date?: Timestamp | Date | string) {
@@ -38,19 +39,22 @@ function formatDate(date?: Timestamp | Date | string) {
 }
 
 export default function ToDoTasks() {
-    const { listId } = useParams<{ listId: string }>();
+    const router = useRouter();
+    const { listId } = router.query;
+
     const [tasks, setTasks] = useState<Task[]>([]);
     const [usersInfo, setUsersInfo] = useState<Record<string, UserInfo>>({});
     const [loading, setLoading] = useState(true);
-    const router = useRouter();
 
     useEffect(() => {
+        if (!listId || typeof listId !== "string") return;
+
         async function fetchData() {
             setLoading(true);
 
             const user = auth.currentUser;
             if (!user) {
-                router.push("/login");
+                await router.push("/login");
                 return;
             }
 
@@ -69,24 +73,31 @@ export default function ToDoTasks() {
             const listSnap = await getDoc(listRef);
             if (!listSnap.exists()) {
                 alert("Список не знайдено");
-                router.push("/todo-lists");
+                await router.push("/todo-lists");
                 return;
             }
 
             const participants = listSnap.data().participants || {};
-            const userIds = Object.keys(participants);
+            const uniqueUserIds = new Set<string>(Object.keys(participants));
+            for (const task of fetchedTasks) {
+                if (task.assignedTo) {
+                    uniqueUserIds.add(task.assignedTo);
+                }
+            }
 
-            if (userIds.length) {
+            if (uniqueUserIds.size > 0) {
                 const users: Record<string, UserInfo> = {};
-                for (const uid of userIds) {
+                for (const uid of uniqueUserIds) {
                     const userDoc = await getDoc(doc(db, "users", uid));
                     if (userDoc.exists()) {
                         users[uid] = {
-                            displayName: userDoc.data().displayName || "Невідомо",
+                            name: userDoc.data().name || "Невідомо",
                         };
                     }
                 }
                 setUsersInfo(users);
+            } else {
+                setUsersInfo({});
             }
 
             setLoading(false);
@@ -112,6 +123,12 @@ export default function ToDoTasks() {
                     className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded"
                 >
                     Створити таску
+                </button>
+                <button
+                    onClick={() => router.push(`/todo-lists/${listId}/add-user`)}
+                    className="mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded"
+                >
+                    Додати учасника
                 </button>
                 <button
                     onClick={() => router.push("/todo-lists")}
@@ -140,7 +157,7 @@ export default function ToDoTasks() {
                             <div>
                                 Виконавець:{" "}
                                 {task.assignedTo
-                                    ? usersInfo[task.assignedTo]?.displayName ?? "-"
+                                    ? usersInfo[task.assignedTo]?.name ?? "-"
                                     : "-"}
                             </div>
                             <div>Створено: {formatDate(task.createdAt)}</div>
@@ -156,6 +173,12 @@ export default function ToDoTasks() {
                 className="mt-8 bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded"
             >
                 Додати нову таску
+            </button>
+            <button
+                onClick={() => router.push(`/todo-lists/${listId}/add-user`)}
+                className="mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded"
+            >
+                Додати учасника
             </button>
         </div>
     );

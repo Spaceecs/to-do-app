@@ -1,37 +1,42 @@
-import "@/app/globals.css"
+"use client";
+
+import "@/app/globals.css";
 import { Formik, Form, Field, ErrorMessage } from "formik";
-import * as Yup from "yup"
-import {signInWithEmailAndPassword } from "firebase/auth"
-import {auth} from "@/utils/firebase"
-import {useRouter} from "next/navigation";
+import * as Yup from "yup";
+import { signInWithEmailAndPassword, getIdToken } from "firebase/auth";
+import { auth } from "@/utils/firebase";
+import { useRouter } from "next/navigation";
 
 const loginSchema = Yup.object().shape({
     email: Yup.string().email("Invalid email").required("Email required"),
-    password: Yup.string().min(8,"Minimum 8 characters").required("Password required")
-})
+    password: Yup.string().min(8, "Minimum 8 characters").required("Password required"),
+});
 
 export default function Login() {
-    const router = useRouter()
-    return(
+    const router = useRouter();
+
+    return (
         <div className="flex items-center justify-center min-h-screen bg-white">
             <div className="max-w-md mx-auto border-2 border-black p-12 bg-white rounded-xl shadow-md">
                 <h2 className="text-2xl font-bold text-center mb-6 text-black">Login</h2>
-                <Formik initialValues={{email: "", password: ""}}
-                        validationSchema={loginSchema}
-                        onSubmit={async (values, {setSubmitting, setStatus}) => {
-                    setStatus(null);
-                    try {
-                        await signInWithEmailAndPassword (auth, values.email, values.password);
-                        console.log("user enter successfully")
-                        await router.push("/todo-lists")
-                    }
-                    catch (err: any){
-                        setStatus("Invalid email or password")
-                    }
-                    setSubmitting(false);
-                }}
+                <Formik
+                    initialValues={{ email: "", password: "" }}
+                    validationSchema={loginSchema}
+                    onSubmit={async (values, { setSubmitting, setStatus }) => {
+                        setStatus(null);
+                        try {
+                            const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
+                            const token = await getIdToken(userCredential.user);
+                            localStorage.setItem("token", token);
+                            console.log("User logged in successfully");
+                            await router.push("/todo-lists");
+                        } catch (err: any) {
+                            setStatus("Invalid email or password");
+                        }
+                        setSubmitting(false);
+                    }}
                 >
-                    {({isSubmitting, status}) => (
+                    {({ isSubmitting, status }) => (
                         <Form className="space-y-4">
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
@@ -66,6 +71,7 @@ export default function Login() {
                             >
                                 {isSubmitting ? "Wait..." : "Enter"}
                             </button>
+
                             <p className="text-sm text-center text-gray-600 mt-4">
                                 Not registered?{" "}
                                 <a href="/register" className="text-blue-600 hover:underline font-medium">
@@ -77,5 +83,5 @@ export default function Login() {
                 </Formik>
             </div>
         </div>
-    )
+    );
 }

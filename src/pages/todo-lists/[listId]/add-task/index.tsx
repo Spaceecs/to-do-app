@@ -38,7 +38,19 @@ export default function AddTaskPage() {
             }
 
             const data = listSnap.data();
-            setParticipants(data.participants || {});
+            const participantUids = Object.keys(data.participants || {});
+            const usersMap: Record<string, { displayName: string }> = {};
+
+            for (const uid of participantUids) {
+                const userDoc = await getDoc(doc(db, "users", uid));
+                if (userDoc.exists()) {
+                    usersMap[uid] = {
+                        displayName: userDoc.data().displayName || userDoc.data().name || userDoc.data().email || "Без імені"
+                    };
+                }
+            }
+
+            setParticipants(usersMap);
         }
 
         fetchParticipants();
@@ -124,8 +136,10 @@ export default function AddTaskPage() {
                         className="w-full border px-4 py-2 rounded"
                     >
                         <option value="">Не призначено</option>
-                        {Object.keys(participants).map(uid => (
-                            <option key={uid} value={uid}>{uid}</option>
+                        {Object.entries(participants).map(([uid, info]) => (
+                            <option key={uid} value={uid}>
+                                {info.displayName}
+                            </option>
                         ))}
                     </select>
                 </div>
