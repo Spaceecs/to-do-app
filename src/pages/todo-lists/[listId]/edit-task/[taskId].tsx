@@ -3,20 +3,22 @@
 import "@/app/globals.css"
 import React, { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Timestamp, addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
+import { Timestamp, doc, getDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/utils/firebase";
 
-export default function AddTaskPage() {
+export default function EditTaskPage() {
     const router = useRouter();
     const params = useParams();
     const listId = params?.listId as string;
+    const taskId = params?.taskId as string;
 
     const [title, setTitle] = useState("");
     const [body, setBody] = useState("");
     const [dueDate, setDueDate] = useState("");
     const [priority, setPriority] = useState<"low" | "medium" | "high">("medium");
     const [assignedTo, setAssignedTo] = useState("");
-    const [participants, setParticipants] = useState<Record<string, "admin" | "viewer">>({});
+    const [participants, setParticipants] = useState<Record<string, { displayName: string }>>({});
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         async function fetchParticipants() {
@@ -56,6 +58,37 @@ export default function AddTaskPage() {
         fetchParticipants();
     }, [listId, router]);
 
+    useEffect(() => {
+        async function fetchTask() {
+            if (!taskId) {
+                alert("ID таски не задано");
+                router.push(`/todo-lists/${listId}`);
+                return;
+            }
+
+            setLoading(true);
+            const taskRef = doc(db, "tasks", taskId);
+            const taskSnap = await getDoc(taskRef);
+
+            if (!taskSnap.exists()) {
+                alert("Таску не знайдено");
+                router.push(`/todo-lists/${listId}`);
+                return;
+            }
+
+            const data = taskSnap.data();
+
+            setTitle(data.title || "");
+            setBody(data.body || "");
+            setDueDate(data.dueDate ? (data.dueDate instanceof Timestamp ? data.dueDate.toDate().toISOString().substring(0, 10) : "") : "");
+            setPriority(data.priority || "medium");
+            setAssignedTo(data.assignedTo || "");
+            setLoading(false);
+        }
+
+        fetchTask();
+    }, [taskId, listId, router]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -65,24 +98,31 @@ export default function AddTaskPage() {
             return;
         }
 
-        await addDoc(collection(db, "tasks"), {
-            title,
-            body,
-            taskListId: listId,
-            checked: false,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            dueDate: dueDate ? Timestamp.fromDate(new Date(dueDate)) : null,
-            priority,
-            assignedTo: assignedTo || null,
-        });
+        try {
+            const taskRef = doc(db, "tasks", taskId);
+            await updateDoc(taskRef, {
+                title,
+                body,
+                dueDate: dueDate ? Timestamp.fromDate(new Date(dueDate)) : null,
+                priority,
+                assignedTo: assignedTo || null,
+                updatedAt: Timestamp.now(),
+            });
 
-        router.push(`/todo-lists/${listId}`);
+            router.push(`/todo-lists/${listId}`);
+        } catch (error) {
+            console.error("Помилка при оновленні таски:", error);
+            alert("Сталася помилка при оновленні таски.");
+        }
     };
+
+    if (loading) {
+        return <div className="flex justify-center items-center min-h-screen">Завантаження...</div>;
+    }
 
     return (
         <div className="max-w-xl mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-6">Створити нову таску</h1>
+            <h1 className="text-2xl font-bold mb-6">Редагувати таску</h1>
             <form onSubmit={handleSubmit} className="space-y-4">
 
                 <div>
@@ -148,7 +188,7 @@ export default function AddTaskPage() {
                     type="submit"
                     className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded"
                 >
-                    Додати таску
+                    Зберегти зміни
                 </button>
                 <button
                     onClick={() => router.push(`/todo-lists/${listId}`)}

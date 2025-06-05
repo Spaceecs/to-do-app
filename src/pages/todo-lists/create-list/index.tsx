@@ -47,7 +47,7 @@ export default function CreateList() {
                                     [user.uid]: {
                                         id: user.uid,
                                         name,
-                                        status: "admin",
+                                        status: "owner",
                                     },
                                 },
                                 participantsIds: [user.uid],

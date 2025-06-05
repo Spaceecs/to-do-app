@@ -2,7 +2,7 @@
 
 import "@/app/globals.css"
 import { useRouter } from "next/router";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
     collection,
     query,
@@ -20,7 +20,7 @@ export default function AddUserPage() {
 
     const [email, setEmail] = useState("");
     const [status, setStatus] = useState<string | null>(null);
-    const [role, setRole] = useState<"admin" | "member">("member"); // стан ролі
+    const [role, setRole] = useState<"admin" | "member">("member");
 
     useEffect(() => {
         if (!listId) {
@@ -114,7 +114,7 @@ export default function AddUserPage() {
 
             <button
                 onClick={handleAddUser}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded mb-3"
                 disabled={!listId}
             >
                 Додати
@@ -124,9 +124,9 @@ export default function AddUserPage() {
 
             <button
                 onClick={() => router.push(`/todo-lists/${listId}`)}
-                className="mt-4 text-blue-600 underline"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded"
             >
-                Назад
+                назад
             </button>
         </div>
     );

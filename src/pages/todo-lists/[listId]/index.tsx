@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import "@/app/globals.css";
 import { useRouter } from "next/router";
@@ -11,6 +11,8 @@ import {
     query,
     where,
     Timestamp,
+    updateDoc,
+    deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/utils/firebase";
 
@@ -45,6 +47,8 @@ export default function ToDoTasks() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [usersInfo, setUsersInfo] = useState<Record<string, UserInfo>>({});
     const [loading, setLoading] = useState(true);
+    const [userRole, setUserRole] = useState<"owner" | "admin" | "member" | null>(null);
+    const [setUserId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!listId || typeof listId !== "string") return;
@@ -57,6 +61,9 @@ export default function ToDoTasks() {
                 await router.push("/login");
                 return;
             }
+
+            const uid = user.uid;
+            setUserId(uid);
 
             const taskQuery = query(
                 collection(db, "tasks"),
@@ -77,7 +84,11 @@ export default function ToDoTasks() {
                 return;
             }
 
-            const participants = listSnap.data().participants || {};
+            const listData = listSnap.data();
+            const participants = listData.participants || {};
+            const role = participants[uid]?.status || "member";
+            setUserRole(role);
+
             const uniqueUserIds = new Set<string>(Object.keys(participants));
             for (const task of fetchedTasks) {
                 if (task.assignedTo) {
@@ -106,6 +117,36 @@ export default function ToDoTasks() {
         fetchData();
     }, [listId, router]);
 
+    const toggleTaskChecked = async (taskId: string, currentValue: boolean) => {
+        try {
+            const taskRef = doc(db, "tasks", taskId);
+            await updateDoc(taskRef, {
+                checked: !currentValue,
+                updatedAt: new Date(),
+            });
+
+            setTasks((prev) =>
+                prev.map((t) =>
+                    t.id === taskId ? { ...t, checked: !currentValue } : t
+                )
+            );
+        } catch (error) {
+            console.error("Помилка при оновленні задачі:", error);
+        }
+    };
+
+    const deleteTask = async (taskId: string) => {
+        if (!confirm("Ви дійсно хочете видалити цю таску?")) return;
+
+        try {
+            await deleteDoc(doc(db, "tasks", taskId));
+            setTasks((prev) => prev.filter((t) => t.id !== taskId));
+        } catch (error) {
+            console.error("Помилка при видаленні задачі:", error);
+            alert("Не вдалося видалити таску.");
+        }
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-screen">
@@ -118,23 +159,29 @@ export default function ToDoTasks() {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen">
                 <p className="mb-4 text-gray-700 text-lg">Тут ще нема тасок</p>
-                <button
-                    onClick={() => router.push(`/todo-lists/${listId}/add-task`)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded"
-                >
-                    Створити таску
-                </button>
-                <button
-                    onClick={() => router.push(`/todo-lists/${listId}/add-user`)}
-                    className="mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded"
-                >
-                    Додати учасника
-                </button>
+
+                {(userRole === "admin" || userRole === "owner") && (
+                    <>
+                        <button
+                            onClick={() => router.push(`/todo-lists/${listId}/add-task`)}
+                            className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded"
+                        >
+                            Створити таску
+                        </button>
+                        <button
+                            onClick={() => router.push(`/todo-lists/${listId}/add-user`)}
+                            className="mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded"
+                        >
+                            Додати учасника
+                        </button>
+                    </>
+                )}
+
                 <button
                     onClick={() => router.push("/todo-lists")}
-                    className="mt-4 text-blue-600 underline"
+                    className=" mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded"
                 >
-                    Повернутися до списків
+                    Назад
                 </button>
             </div>
         );
@@ -143,13 +190,68 @@ export default function ToDoTasks() {
     return (
         <div className="max-w-4xl mx-auto p-6">
             <h1 className="text-3xl font-bold mb-6">Таски</h1>
+            <button
+                onClick={() => router.push("/todo-lists")}
+                className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-6 rounded mb-6"
+            >
+                Назад
+            </button>
             <ul className="space-y-6">
                 {tasks.map((task) => (
                     <li
                         key={task.id}
                         className="border p-4 rounded shadow hover:shadow-lg transition"
                     >
-                        <h2 className="text-xl font-semibold">{task.title}</h2>
+                        <div className="flex justify-between items-center">
+                            <h2 className="text-xl font-semibold">{task.title}</h2>
+
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => toggleTaskChecked(task.id, task.checked)}
+                                    className={`w-6 h-6 border rounded-full ${
+                                        task.checked
+                                            ? "bg-green-600 border-green-700"
+                                            : "border-gray-400"
+                                    }`}
+                                    title="Позначити як виконано"
+                                >
+                                    {task.checked && (
+                                        <svg
+                                            className="w-4 h-4 text-white mx-auto"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="3"
+                                            viewBox="0 0 24 24"
+                                        >
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                d="M5 13l4 4L19 7"
+                                            />
+                                        </svg>
+                                    )}
+                                </button>
+
+                                <button
+                                    onClick={() => router.push(`/todo-lists/${listId}/edit-task/${task.id}`)}
+                                    className="text-blue-600 hover:underline"
+                                    title="Редагувати таску"
+                                >
+                                    Редагувати
+                                </button>
+
+                                {(userRole === "admin" || userRole === "owner") && (
+                                    <button
+                                        onClick={() => deleteTask(task.id)}
+                                        className="text-red-600 hover:underline"
+                                        title="Видалити таску"
+                                    >
+                                        Видалити
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
                         <p className="text-gray-700 mt-1">{task.body}</p>
                         <div className="mt-2 text-sm text-gray-600 flex flex-wrap gap-4">
                             <div>Статус: {task.checked ? "Виконано" : "В процесі"}</div>
@@ -168,18 +270,22 @@ export default function ToDoTasks() {
                 ))}
             </ul>
 
-            <button
-                onClick={() => router.push(`/todo-lists/${listId}/add-task`)}
-                className="mt-8 bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded"
-            >
-                Додати нову таску
-            </button>
-            <button
-                onClick={() => router.push(`/todo-lists/${listId}/add-user`)}
-                className="mt-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded"
-            >
-                Додати учасника
-            </button>
+            {(userRole === "admin" || userRole === "owner") && (
+                <>
+                    <button
+                        onClick={() => router.push(`/todo-lists/${listId}/add-task`)}
+                        className="mt-8 bg-green-600 hover:bg-green-700 text-white py-2 px-6 rounded"
+                    >
+                        Додати нову таску
+                    </button>
+                    <button
+                        onClick={() => router.push(`/todo-lists/${listId}/add-user`)}
+                        className="ml-4 bg-purple-600 hover:bg-purple-700 text-white py-2 px-6 rounded"
+                    >
+                        Додати учасника
+                    </button>
+                </>
+            )}
         </div>
     );
 }

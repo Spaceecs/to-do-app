@@ -3,7 +3,7 @@
 import "@/app/globals.css";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
-import { signInWithEmailAndPassword, getIdToken } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/utils/firebase";
 import { useRouter } from "next/navigation";
 
@@ -25,9 +25,7 @@ export default function Login() {
                     onSubmit={async (values, { setSubmitting, setStatus }) => {
                         setStatus(null);
                         try {
-                            const userCredential = await signInWithEmailAndPassword(auth, values.email, values.password);
-                            const token = await getIdToken(userCredential.user);
-                            localStorage.setItem("token", token);
+                            await signInWithEmailAndPassword(auth, values.email, values.password);
                             console.log("User logged in successfully");
                             await router.push("/todo-lists");
                         } catch (err: any) {
